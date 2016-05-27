@@ -76,7 +76,6 @@ class EssayGraderModel(Model):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    self.input_placeholder = tf.placeholder(tf.int32, shape=(None, None))
     self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.num_domains))
     self.dropout_placeholder = tf.placeholder(tf.float32)
     ### END YOUR CODE
@@ -106,7 +105,6 @@ class EssayGraderModel(Model):
     if label_batch is None:
       label_batch = np.zeros((1, self.config.num_domains))
     feed_dict = {
-      self.input_placeholder : input_batch,
       self.labels_placeholder : label_batch,
       self.dropout_placeholder : dropout
     }
