@@ -118,10 +118,15 @@ class EssayGraderModel(Model):
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
       L = tf.Variable(tf.convert_to_tensor(self.num_uniquewords, dtype=tf.float32))
-      window = tf.nn.embedding_lookup(L, self.input_placeholder)
-      window = tf.reduce_mean(window, 0)
+      start = True
+      for essay in self.input_placeholder:
+        essay_vec = tf.nn.embedding_lookup(L, essay)
+        essay_vec = tf.reduce_mean(essay_vec, 0)
+        all_vecs = essay_vec if start else tf.concat(0, [essay_vec, all_vecs])
+        start = False
+
       ### END YOUR CODE
-      return window
+      return all_vecs
 
   def add_model(self, window):
     """Adds the 1-hidden-layer NN.
