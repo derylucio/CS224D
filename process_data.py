@@ -37,6 +37,7 @@ class Essay:
     self.id = (int)(essay_info[0])
     self.set = (int)(essay_info[1])
     self.content = essay_info[2]
+    self.grade = (float)(essay_info[6])
     if mode == 0:
     	self.grade = (float)(essay_info[6])
 	    # if essay_info[5] == '':
@@ -56,6 +57,12 @@ class Essay:
 
   def setVector(self, v):
   	self.vector = v
+
+  def getVector(self):
+  	return self.vector
+
+  def getGrade(self):
+  	return self.grade
 
 # train_essays = dict()
 # test_essays = dict()
@@ -82,6 +89,19 @@ class DataProcessor:
   	self.test = None
   	self.valid = None
   	self.pred = None
+  	self.vocab_size = None
+  	self.nTrain = None
+  	self.nValid = None
+  	self.nTest = None
+  	self.trainX = None
+  	self.trainY = None
+  	self.validX = None
+  	self.validY = None
+  	self.testX = None
+  	self.testY = None
+  	self.readTrainedWordVector(glove_file)
+  	self.readInData(train_file, 0)
+  	self.convertToTrain()
 
   def readPrediction(self, filename):
   	prediction = {}
@@ -117,9 +137,9 @@ class DataProcessor:
   			# 	print words[word]
 	# normalize correctly now
 
-	vocab_size = len(words)
-	vector_dim = len(words[ivocab[0]])
-	W = np.zeros((vocab_size, vector_dim))
+	self.vocab_size = len(words)
+	# vector_dim = len(words[ivocab[0]]) # the same as N
+	W = np.zeros((self.vocab_size, N))
 	for word, v in words.items():
 		W[vocab[word], :] = v
 	W_norm = np.zeros(W.shape)
@@ -129,6 +149,35 @@ class DataProcessor:
 	self.W = W_norm
 	self.vocab = vocab
 	self.ivocab = ivocab
+
+  def convertToTrain(self):
+  	train_X = np.zeros((self.nTrain, N))
+  	train_Y = np.zeros(self.nTrain)
+  	index = 0
+	for e_id, e in self.train.items():
+		train_X[index, :] = e.getVector()
+		train_Y[index] = e.getGrade()
+	self.trainX = train_X
+	self.trainY = train_Y
+
+	valid_X = np.zeros((self.nValid, N))
+	valid_Y = np.zeros(self.nValid)
+	index = 0
+	for e_id, e in self.valid.items():
+		valid_X[index, :] = e.getVector()
+		valid_Y[index] = e.getGrade()
+	self.validX = valid_X
+	self.validY = valid_Y
+
+	test_X = np.zeros((self.nTest, N))
+	test_Y = np.zeros(self.nTest)
+	index = 0
+	for e_id, e in self.test.items():
+		test_X[index, :] = e.getVector()
+		test_Y[index] = e.getGrade()
+	self.testX = test_X
+	self.testY = test_Y
+
 
   def readInData(self, filename, mode):
   	train_list = {}
@@ -179,12 +228,16 @@ class DataProcessor:
   						train_list[essay.id] = essay
   					else:
   						test_list[essay.id] = essay
+  	
   	self.train = train_list
   	self.valid = valid_list
   	self.test = test_list
-  	print "# train sample: ", len(self.train)
-  	print "# valid sample: ", len(self.valid)
-  	print "# test sample: ", len(self.test)
+  	self.nTrain = len(self.train)
+  	self.nValid = len(self.valid)
+  	self.nTest = len(self.test)
+  	print "# train sample: ", self.nTrain
+  	print "# valid sample: ", self.nValid
+  	print "# test sample: ", self.nTest
   			# essay_list.append(essay_vector)
   	# if mode == 0:
   	# 	self.train = essay_list
@@ -201,11 +254,15 @@ if __name__ == '__main__':
   """
   N = 50
   processor = DataProcessor(N)
-  processor.readTrainedWordVector(glove_file)
+  # processor.readTrainedWordVector(glove_file)
   # print processor.vocab
   # print processor.W[9]
   # W, vocab, ivocab = processor.readTrainedWordVector(glove_file)
-  processor.readInData(train_file, 0)
+  # processor.readInData(train_file, 0)
+  # processor.convertToTrain()
+  print "# train sample: ", processor.trainX.shape
+  print "# valid sample: ", processor.validX.shape
+  print "# test sample: ", processor.testX.shape
   # processor.readPrediction(prediction_file)
   # processor.readInData(valid_file, 1)
   # processor.readInData(valid_file, "valid")
