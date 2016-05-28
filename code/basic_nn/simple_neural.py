@@ -6,9 +6,10 @@ import time
 import numpy as np
 import tensorflow as tf
 from q2_initialization import xavier_weight_init
-import data_utils.utils as du
 from utils import data_iterator
+from process_data import DataProcessor
 from model import LanguageModel
+
 
 class Config(object):
   """Holds model hyperparams and data information.
@@ -18,38 +19,34 @@ class Config(object):
   instantiation.
   """
   embed_size = 50
-  batch_size = 64
-  num_domains = 2
+  max_essay_length = 950
+  batch_size = 32
+  num_domains = 1
   hidden_size = 100
   max_epochs = 24
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
   l2 = 0.0001
+  train_fract = 0.7
   window_size = 3
 
-class EssayGraderModel(Model):
+class EssayGraderModel(LanguageModel):
 
   def load_data(self, debug=False):
-     """Loads starter word-vectors and train/dev/test data."""
-    # Load the starter word vectors
-    self.num_uniquewords #to recieve
-    # Load the training set
-    self.X_train, self.y_train #to receive
-    if debug:
-      self.X_train = self.X_train[:1024]
-      self.y_train = self.y_train[:1024]
-
-    # Load the dev set (for tuning hyperparameters)
-    docs = du.load_dataset('data/ner/dev')
-    self.X_dev, self.y_dev = #to receive
-    if debug:
-      self.X_dev = self.X_dev[:1024]
-      self.y_dev = self.y_dev[:1024]
+    data_processor = DataProcessor()
+    X_train, y_train = data_processor.getData(0)
+    num_train = int(self.config.train_fract*X_train.shape[0])
+    print num_train
+    self.X_train = X_train[:num_train]
+    self.y_train = y_train[:num_train]
+    self.X_dev = X_train[num_train:]
+    self.y_dev = y_train[num_train:]
 
     # Load the test set (dummy labels only)
-    self.X_test, self.y_test #to receive
-   
+    # self.X_test, self.y_test = data_processor.getData(1)
+    self.num_uniquewords = data_processor.getNumUnique() #to recieve
+
 
   def add_placeholders(self):
     """Generate placeholder variables to represent the input tensors
@@ -76,7 +73,7 @@ class EssayGraderModel(Model):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    self.input_placeholder = tf.placeholder(tf.int32, shape=(None, None))
+    self.input_placeholder = tf.placeholder(tf.int32, shape=(None, self.config.max_essay_length))
     self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.num_domains))
     self.dropout_placeholder = tf.placeholder(tf.float32)
     ### END YOUR CODE
@@ -117,11 +114,11 @@ class EssayGraderModel(Model):
     #super simple model, just takes the mean of all the words as an indicator of the essay.
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      L = tf.Variable(tf.convert_to_tensor(self.num_uniquewords, dtype=tf.float32))
-      window = tf.nn.embedding_lookup(L, self.input_placeholder)
-      window = tf.reduce_mean(window, 0)
-      ### END YOUR CODE
-      return window
+      with tf.variable_scope('Embedding') as Embed:
+        embedding = tf.get_variable("Embedding_matrix", [self.num_uniquewords, self.config.embed_size])
+        word_vecs = tf.nn.embedding_lookup(embedding, self.input_placeholder)
+        word_vecs = tf.reduce_mean(word_vecs, 1)
+      return word_vecs
 
   def add_model(self, window):
     """Adds the 1-hidden-layer NN.
@@ -155,12 +152,16 @@ class EssayGraderModel(Model):
       W = tf.get_variable('W', (self.config.embed_size, self.config.hidden_size), initializer=xavier_weight_init())
       b1 = tf.get_variable('b1', (self.config.hidden_size,), initializer=xavier_weight_init())
       h = tf.tanh(tf.matmul(window, W)+ b1)
-      with tf.variable_scope('Score') as score_scope:
-        U = tf.get_variable('U', (self.config.hidden_size, self.config.num_domains), initializer=xavier_weight_init())
-        h = tf.nn.dropout(h, self.dropout_placeholder)
-        output = tf.matmul(h, U)
-        regularization = self.config.l2*0.5*(tf.reduce_sum(tf.square(W)) + tf.reduce_sum(tf.square(U)))
-        tf.add_to_collection('REGULARIZATION_LOSSES', regularization)
+      with tf.variable_scope('Layer2') as hidden_2:
+        W2 = tf.get_variable('W2', (self.config.hidden_size, self.config.hidden_size), initializer=xavier_weight_init())
+        b2 = tf.get_variable('b2', (self.config.hidden_size,), initializer=xavier_weight_init())
+        h2 = tf.tanh(tf.matmul(h, W2)+ b2)
+        with tf.variable_scope('Score') as score_scope:
+          U = tf.get_variable('U', (self.config.hidden_size, self.config.num_domains), initializer=xavier_weight_init())
+          h2 = tf.nn.dropout(h2, self.dropout_placeholder)
+          output = tf.matmul(h2, U)
+          regularization = self.config.l2*0.5*(tf.reduce_sum(tf.square(W)) + tf.reduce_sum(tf.square(W2)) + tf.reduce_sum(tf.square(U)))
+          tf.add_to_collection('REGULARIZATION_LOSSES', regularization)
 
 
     ### END YOUR CODE
@@ -177,8 +178,9 @@ class EssayGraderModel(Model):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    reg = tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Softmax')[0]
-    loss = tf.reduce_sum(tf.square_difference(y, self.labels_placeholder)) + reg
+    print reg
+    reg = tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Layer2/Score')
+    loss = tf.reduce_mean(tf.square(y - self.labels_placeholder)) + reg
     ### END YOUR CODE
     return loss
 
@@ -224,10 +226,11 @@ class EssayGraderModel(Model):
     dp = self.config.dropout
     # We're interested in keeping track of the loss and accuracy during training
     total_loss = []
-    total_steps = len(orig_X) / self.config.batch_size
-    for step, (x, y) in enG:umerate(
+    total_processed_examples = 0
+    total_steps = len(orig_X)/ self.config.batch_size
+    for step, (x, y) in enumerate(
       data_iterator(orig_X, orig_y, batch_size=self.config.batch_size,
-                   num_domains=self.config.num_domains, shuffle=shuffle)):
+                   label_size=self.config.num_domains, shuffle=shuffle)):
       feed = self.create_feed_dict(input_batch=x, dropout=dp, label_batch=y)
       loss, _ = session.run(
           [self.loss, self.train_op],
@@ -253,10 +256,10 @@ class EssayGraderModel(Model):
     results = []
     if np.any(y):
         data = data_iterator(X, y, batch_size=self.config.batch_size,
-                             num_domains=self.config.num_domains, shuffle=False)
+                             label_size=self.config.num_domains, shuffle=False)
     else:
         data = data_iterator(X, batch_size=self.config.batch_size,
-                             num_domains=self.config.num_domains, shuffle=False)
+                             label_size=self.config.num_domains, shuffle=False)
     for step, (x, y) in enumerate(data):
       feed = self.create_feed_dict(input_batch=x, dropout=dp)
       if np.any(y):
@@ -267,7 +270,7 @@ class EssayGraderModel(Model):
       else:
         preds = session.run(self.predictions, feed_dict=feed)
       results.extend(preds)
-    return np.mean(losses), results
+    return np.mean(losses)
 
 
 def test_SimpleEssayGrader():
@@ -297,7 +300,6 @@ def test_SimpleEssayGrader():
                                                 model.y_train)
         val_loss = model.predict(session, model.X_dev, model.y_dev)
         print 'Training loss: {}'.format(train_loss)
-        print 'Training acc: {}'.format(train_acc)
         print 'Validation loss: {}'.format(val_loss)
         if val_loss < best_val_loss:
           best_val_loss = val_loss
@@ -309,7 +311,7 @@ def test_SimpleEssayGrader():
         if epoch - best_val_epoch > config.early_stopping:
           break
         ###
-         print 'Total time: {}'.format(time.time() - start)
+        print 'Total time: {}'.format(time.time() - start)
       
       saver.restore(session, './weights/ner.weights')
       print 'Test'

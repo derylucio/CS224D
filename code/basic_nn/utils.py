@@ -19,9 +19,7 @@ def data_iterator(orig_X, orig_y=None, batch_size=32, label_size=2, shuffle=Fals
     # Convert our target from the class index to a one hot vector
     y = None
     if np.any(data_y):
-      y_indices = data_y[batch_start:batch_start + batch_size]
-      y = np.zeros((len(x), label_size), dtype=np.int32)
-      y[np.arange(len(y_indices)), y_indices] = 1
+      y = data_y[batch_start:batch_start + batch_size]
     ###
     yield x, y
     total_processed_examples += len(x)

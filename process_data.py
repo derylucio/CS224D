@@ -1,63 +1,60 @@
 import sys, csv, collections
 import numpy as np
 
-train_file = "data/train_small.tsv"
-test_file = "data/test_small.tsv"
-valid_file = "data/valid_small.tsv"
-ESSAY_INDEX = 2
-ESSAY_ID_INDEX = 0
-DOMAIN_1_INDEX = 6
-
-class Essay:
-  """
-  Each represents information associated with an essay
-  """
-  def __init__(self, essay_id, grades):
-    self.grades = grades
-
-  def test():
-  	print "in test"
-
-train_essays = dict()
-test_essays = dict()
-valid_essays = dict()
-
 #will need to unpack the information.
 class DataProcessor:
 
   def __init__(self):
-    self.word_index_map = {}
-    self.num_unique = 0
+    self.word_index_map = {"PADDING" : 0}
+    #let the zero index be for the padding
+    self.num_unique = 1
+    self.train_file = ".../../data/train_small.tsv"
+    self.test_file = ".../.../data/test_small.tsv"
+    self.valid_file = ".../.../data/valid_small.tsv"
+    self.ESSAY_INDEX = 2
+    self.ESSAY_ID_INDEX = 0
+    self.DOMAIN_1_INDEX = 6
+
 
   def readInData(self, filename):
-    essay_list = []
   	with open(filename, 'rb') as tsv:
   		data = csv.reader(tsv, delimiter='\n')
-  		iterdata = iter(data)
+      start = True
+      iterdata = iter(data)
   		for row in iterdata:
-        wv_indices = []
+        wv_indices = np.zeros(550)
+        scores = np.zeros(1)
   			entries = row.split("\t")
-        essay = entries[ESSAY_INDEX]
+        print entries
+        essay = entries[self.ESSAY_INDEX]
+        scores[0] = entries[self.DOMAIN_1_INDEX]
         words = essay.split()
+        i = 0
         for word in words:
           if word in self.word_index_map:
-            wv_indices.append(self.word_index_map[word])
+            wv_indices[i] = self.word_index_map[word]
           else:
             self.word_index_map[word] = self.num_unique
+            wv_indices[i] = self.num_unique
             self.num_unique += 1
-        essay_list.append(np.array(wv_indices))
+          i += 1
+        if start:
+          essay_list = wv_indices
+          essay_scores = scores
+          start = False
+        else:
+          essay_scores = np.vstack((essay_scores, scores))
+          essay_list = np.vstack((essay_list, wv_indices))
     return essay_list, essay_scores
-	# print data
 
+  def getData(self, dataset):
+    if dataset == 0:
+      essays, scores = self.readInData(self.train_file)
+    elif dataset == 1:
+      essays, scores = self.readInData(self.test_file)
+    else:
+      essays, scores = self.readInData(self.valid_file)
+    return essays, scores
 
-if __name__ == '__main__':
-  """
-  The main function
-  """
-  processor = DataProcessor()
-  train_essays, train_scores = processor.readInData(train_file)
-  test_essays, test_scores = processor.readInData(test_file)
-  valid_essays, valid_scores = processor.readInData(valid_file)
-  # import cProfile
-  # cProfile.run("runGames( **args )")
-  pass
+  def getNumUnique(self):
+    return self.num_unique
