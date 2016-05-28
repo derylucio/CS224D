@@ -1,6 +1,12 @@
 import sys, csv, collections, os
 import numpy as np
 
+#dummies
+# self.saved_data_essay = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/checktrainessays"
+# self.saved_data_score = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/checktrainscores"
+# self.saved_data_essay_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trinesys.npy"
+# self.saved_data_score_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trinsors.npy"
+
 #will need to unpack the information.
 class DataProcessor:
 
@@ -13,6 +19,10 @@ class DataProcessor:
     self.valid_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/data/valid_set.tsv"
     self.saved_data_essay = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainessays"
     self.saved_data_score = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainscores"
+    self.saved_data_score_nu = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/nu"
+    self.saved_data_essay_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainessays.npy"
+    self.saved_data_score_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainscores.npy"
+    self.saved_data_score_nu_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/nu.npy"
     self.ESSAY_INDEX = 2
     self.ESSAY_ID_INDEX = 0
     self.DOMAIN_1_INDEX = 6
@@ -21,14 +31,16 @@ class DataProcessor:
 
   def readInData(self, filename, is_test):
     max_words = 0
+    num_files = 0
     with open(filename, 'rb') as tsv:
       data = csv.reader(tsv, delimiter='\n')
       start = True
       iterdata = iter(data)
       next(iterdata) 
       for row in iterdata:
+        num_files += 1
         row = row[0]
-        wv_indices = np.zeros(1065)
+        wv_indices = np.zeros(950)
         if(not is_test):
           scores = np.zeros(1)
         row.replace(" ", "")
@@ -40,7 +52,6 @@ class DataProcessor:
         if(not is_test):
           scores[0] = entries[self.DOMAIN_1_INDEX]
         words = essay.split()
-        max_words = max_words if max_words > len(words) else len(words)
         i = 0
         for word in words:
           if len(word) < 2 or (not word.isalpha()):
@@ -52,6 +63,7 @@ class DataProcessor:
             wv_indices[i] = self.num_unique
             self.num_unique += 1
           i += 1
+        max_words = max_words if max_words > i else i
         if start:
           essay_list = wv_indices
           if(not is_test):
@@ -64,17 +76,20 @@ class DataProcessor:
     if(is_test):
       essay_scores = None
     print max_words
+    print num_files
     return essay_list, essay_scores
 
   def getData(self, dataset):
     if dataset == 0:
-      if os.path.isfile(self.saved_data_essay):
-        essays = np.load(self.saved_data_essay)
-        scores = np.load(self.saved_data_score)
+      if os.path.isfile(self.saved_data_essay_final):
+        essays = np.load(self.saved_data_essay_final)
+        scores = np.load(self.saved_data_score_final)
+        self.num_unique = np.load(self.saved_data_score_nu_final)
       else:
         essays, scores = self.readInData(self.train_file, False)
         np.save(self.saved_data_essay, essays)
         np.save(self.saved_data_score, scores)
+        np.save(self.saved_data_score_nu, np.array([self.getNumUnique]))
     elif dataset == 1:
       essays, scores = self.readInData(self.test_file, True)
     else:

@@ -19,7 +19,7 @@ class Config(object):
   instantiation.
   """
   embed_size = 50
-  max_essay_length = 1065
+  max_essay_length = 950
   batch_size = 32
   num_domains = 1
   hidden_size = 100
@@ -37,13 +37,14 @@ class EssayGraderModel(LanguageModel):
     data_processor = DataProcessor()
     X_train, y_train = data_processor.getData(0)
     num_train = int(self.config.train_fract*X_train.shape[0])
+    print num_train
     self.X_train = X_train[:num_train]
     self.y_train = y_train[:num_train]
     self.X_dev = X_train[num_train:]
     self.y_dev = y_train[num_train:]
 
     # Load the test set (dummy labels only)
-    self.X_test, self.y_test = data_processor.getData(1)
+    # self.X_test, self.y_test = data_processor.getData(1)
     self.num_uniquewords = data_processor.getNumUnique() #to recieve
 
 
@@ -151,12 +152,16 @@ class EssayGraderModel(LanguageModel):
       W = tf.get_variable('W', (self.config.embed_size, self.config.hidden_size), initializer=xavier_weight_init())
       b1 = tf.get_variable('b1', (self.config.hidden_size,), initializer=xavier_weight_init())
       h = tf.tanh(tf.matmul(window, W)+ b1)
-      with tf.variable_scope('Score') as score_scope:
-        U = tf.get_variable('U', (self.config.hidden_size, self.config.num_domains), initializer=xavier_weight_init())
-        h = tf.nn.dropout(h, self.dropout_placeholder)
-        output = tf.matmul(h, U)
-        regularization = self.config.l2*0.5*(tf.reduce_sum(tf.square(W)) + tf.reduce_sum(tf.square(U)))
-        tf.add_to_collection('REGULARIZATION_LOSSES', regularization)
+      with tf.variable_scope('Layer2') as hidden_2:
+        W2 = tf.get_variable('W2', (self.config.hidden_size, self.config.hidden_size), initializer=xavier_weight_init())
+        b2 = tf.get_variable('b2', (self.config.hidden_size,), initializer=xavier_weight_init())
+        h2 = tf.tanh(tf.matmul(h, W2)+ b2)
+        with tf.variable_scope('Score') as score_scope:
+          U = tf.get_variable('U', (self.config.hidden_size, self.config.num_domains), initializer=xavier_weight_init())
+          h2 = tf.nn.dropout(h2, self.dropout_placeholder)
+          output = tf.matmul(h2, U)
+          regularization = self.config.l2*0.5*(tf.reduce_sum(tf.square(W)) + tf.reduce_sum(tf.square(W2)) + tf.reduce_sum(tf.square(U)))
+          tf.add_to_collection('REGULARIZATION_LOSSES', regularization)
 
 
     ### END YOUR CODE
@@ -173,7 +178,8 @@ class EssayGraderModel(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    reg = tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Score')[0]
+    print reg
+    reg = tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Layer2/Score')
     loss = tf.reduce_mean(tf.square(y - self.labels_placeholder)) + reg
     ### END YOUR CODE
     return loss
