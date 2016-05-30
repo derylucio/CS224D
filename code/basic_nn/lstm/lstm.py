@@ -31,8 +31,7 @@ perm = np.random.permutation(X_train.shape[0]);
 
 #get the tfidf data
 tfidf_processor = TFIDFProcessor(50)
-tfidf_matrix = tfidf_processor.train_tfidf_matrix
-np_tfidf  = tfidf_matrix.toarray()
+np_tfidf = tfidf_processor.train_tfidf_matrix
 
 X_train = X_train[perm, :]
 Y_train = Y_train[perm] 
@@ -46,14 +45,6 @@ y_test = Y_train[num_train:]
 np_tfidf = np_tfidf[perm,:]
 np_tfidf_train = np_tfidf[:num_train]
 np_tfidf_test = np_tfidf[num_train:]
-
-#make history callback
-# class LossHistory(keras.callbacks.Callback):
-#     def on_train_begin(self, logs={}):
-#         self.losses = []
-
-#     def on_batch_end(self, batch, logs={}):
-#         self.losses.append(logs.get('loss'))
 
 #builld model
 #LSTM to capture sequence
@@ -75,21 +66,7 @@ final_model.add(Dense(1))
 
 optim = RMSprop(lr=LEARNING_RATE)
 final_model.compile(loss='mean_squared_error', optimizer=optim, metrics=['mse'])
-# checkpointer = ModelCheckpoint(filepath="/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/weights/curr_best.hdf5", verbose=1, save_best_only=True)
-#callbacks=[checkpointer],
-
-final_model.fit([x_train, np_tfidf_train], y_train, batch_size=BATCH_SIZE, nb_epoch=NUM_EPOCHS, validation_split=VALIDATION_SPLIT)
-
-# best_val_loss = float('inf')
-# best_val_epoch = 0  
-# for epoch in xrange(NUM_EPOCHS):
-#     start = time.time()
-#     history = LossHistory()
-#     model.fit(x_train, y_train, batch_size=BATCH_SIZE, callbacks=[history, checkpointer], nb_epoch=1, validation_split=VALIDATION_SPLIT)
-#     if history.val_loss[0] < best_val_loss:
-#       best_val_loss = val_loss
-#       best_val_epoch = epoch
-#     if epoch - best_val_epoch > EARLY_STOPPING:
-#       break
+early_stopper = keras.callbacks.EarlyStopping(monitor='val_loss', patience=EARLY_STOPPING, verbose=0, mode='min')
+final_model.fit([x_train, np_tfidf_train], y_train, batch_size=BATCH_SIZE, nb_epoch=NUM_EPOCHS, validation_split=VALIDATION_SPLIT, callbacks=[early_stopper])
 score =  final_model.evaluate([x_test, np_tfidf_test], y_test, batch_size=BATCH_SIZE)
 print score

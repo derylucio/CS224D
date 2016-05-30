@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from q2_initialization import xavier_weight_init
 from utils import data_iterator
-from process_data import DataProcessor
+from process_glove import DataProcessor
 from model import LanguageModel
 
 

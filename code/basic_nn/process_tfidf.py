@@ -14,6 +14,11 @@ test_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/d
 valid_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/data/valid_set.tsv"
 prediction_file = "/Users/Chip/GitHub/CS224D/data/valid_sample_submission_5_column.csv"
 glove_file = "/Users/Chip/GitHub/CS224D/models/glove.6B/glove.6B.50d.txt"
+saved_tfid_essays = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/tfidf"
+saved_tfid_essays_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/tfidf.npy"
+saved_data_score = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainscores"
+saved_data_score_final = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/code/basic_nn/saved_data/trainscores.npy"
+
 ESSAY_INDEX = 2
 ESSAY_ID_INDEX = 0
 DOMAIN_1_INDEX = 6
@@ -46,30 +51,30 @@ class Essay:
     self.content = essay_info[2]
     self.grade = (float)(essay_info[6])
     if mode == 0:
-    	self.grade = (float)(essay_info[6])
-	    # if essay_info[5] == '':
-	    # 	self.grade = (float)(essay_info[6])/2
-	    # else:
-	    # 	self.grade = (float)(essay_info[6])/3
-	    # if self.set == 1 or self.set == 2 or self.set == 5 or self.set == 6:
-	    # 	self.grade = self.grade * 2
-	    # elif self.set == 3 or self.set == 4:
-	    # 	self.grade = self.grade * 3
-	    # elif self.set == 8:
-	    # 	self.grade = self.grade/3
-	# if mode == 1:
-	# 	self.grade = 
+      self.grade = (float)(essay_info[6])
+      # if essay_info[5] == '':
+      #   self.grade = (float)(essay_info[6])/2
+      # else:
+      #   self.grade = (float)(essay_info[6])/3
+      # if self.set == 1 or self.set == 2 or self.set == 5 or self.set == 6:
+      #   self.grade = self.grade * 2
+      # elif self.set == 3 or self.set == 4:
+      #   self.grade = self.grade * 3
+      # elif self.set == 8:
+      #   self.grade = self.grade/3
+  # if mode == 1:
+  #   self.grade = 
     
     self.vector = None
 
   def setVector(self, v):
-  	self.vector = v
+    self.vector = v
 
   def getVector(self):
-  	return self.vector
+    return self.vector
 
   def getGrade(self):
-  	return self.grade
+    return self.grade
 
 # train_essays = dict()
 # test_essays = dict()
@@ -79,9 +84,9 @@ vocab = dict()
 ivocab = dict()
 
 """
-	W is a dict word:word_vector (word_vector is a list)
-	vocab is a dict word:index
-	ivocab index:word
+  W is a dict word:word_vector (word_vector is a list)
+  vocab is a dict word:index
+  ivocab index:word
 """
 
 #will need to unpack the information.
@@ -103,38 +108,31 @@ class TFIDFProcessor:
     self.validY = None
     self.testX = None
     self.testY = None
-    train, labels = self.readInData(train_file, 0)
-    vectorizer = CountVectorizer(tokenizer=tokenize, stop_words='english', encoding="ISO-8859-1")
-    train_matrix = vectorizer.fit_transform(train)
-    tfidf = TfidfTransformer(norm="l2")
-    tfidf.fit(train_matrix)
-    self.train_tfidf_matrix = tfidf.transform(train_matrix)
-    print "shape: ", self.train_tfidf_matrix.shape
-    self.train_grade = np.array(labels)
-    # print self.train_grade
-    # if dataset == 0:
-    #   if os.path.isfile(self.saved_data_essay_final):
-    #     essays = np.load(self.saved_data_essay_final)
-    #     scores = np.load(self.saved_data_score_final)
-    #     arr = np.load(self.saved_data_score_nu_final)
-    #     self.num_unique = arr[0]
-    #   else:
-    #     essays, scores = self.readInData(self.train_file, False)
-    #     np.save(self.saved_data_essay, essays)
-    #     np.save(self.saved_data_score, scores)
-    #     temp_array = np.array([self.num_unique])
-    #     np.save(self.saved_data_score_nu, temp_array)
-  	# self.readTrainedWordVector(glove_file)
-  	# self.convertToTrain()
+    if(os.path.isfile(saved_tfid_essays_final)):
+      self.train_tfidf_matrix = np.load(saved_tfid_essays_final)
+      self.train_grade = np.load(saved_data_score_final)
+    else:
+      train, labels = self.readInData(train_file, 0)
+      vectorizer = CountVectorizer(tokenizer=tokenize, stop_words='english', encoding="ISO-8859-1")
+      train_matrix = vectorizer.fit_transform(train)
+      tfidf = TfidfTransformer(norm="l2")
+      tfidf.fit(train_matrix)
+      self.train_tfidf_matrix = tfidf.transform(train_matrix)
+      self.train_tfidf_matrix = self.train_tfidf_matrix.toarray()
+      self.train_grade = np.array(labels)
+      np.save(saved_tfid_essays, self.train_tfidf_matrix)
+      np.save(saved_data_score, self.train_grade)
+    # self.readTrainedWordVector(glove_file)
+    # self.convertToTrain()
 
   def readPrediction(self, filename):
-  	prediction = {}
-  	with open(filename, 'rb') as csvin:
-  		data = csv.reader(csvin, delimiter='\n')
-  		iterdata = iter(data)
-  		next(iterdata) # skip the first row
-  		for row in iterdata:
-  			row = row[0].split(',')
+    prediction = {}
+    with open(filename, 'rb') as csvin:
+      data = csv.reader(csvin, delimiter='\n')
+      iterdata = iter(data)
+      next(iterdata) # skip the first row
+      for row in iterdata:
+        row = row[0].split(',')
 
   def convertToTrain(self):
     train_X = np.zeros((self.nTrain, self.N))

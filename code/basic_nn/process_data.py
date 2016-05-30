@@ -40,7 +40,7 @@ class DataProcessor:
       for row in iterdata:
         num_files += 1
         row = row[0]
-        wv_indices = np.zeros(950)
+        wv_indices = np.zeros((950, 1))
         if(not is_test):
           scores = np.zeros(1)
         row.replace(" ", "")
