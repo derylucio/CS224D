@@ -1,4 +1,4 @@
-import sys, csv, collections
+import sys, csv, collections, os
 import argparse, random
 import numpy as np
 
@@ -99,6 +99,18 @@ class DataProcessor:
   	self.validY = None
   	self.testX = None
   	self.testY = None
+    # if dataset == 0:
+    #   if os.path.isfile(self.saved_data_essay_final):
+    #     essays = np.load(self.saved_data_essay_final)
+    #     scores = np.load(self.saved_data_score_final)
+    #     arr = np.load(self.saved_data_score_nu_final)
+    #     self.num_unique = arr[0]
+    #   else:
+    #     essays, scores = self.readInData(self.train_file, False)
+    #     np.save(self.saved_data_essay, essays)
+    #     np.save(self.saved_data_score, scores)
+    #     temp_array = np.array([self.num_unique])
+    #     np.save(self.saved_data_score_nu, temp_array)
   	self.readTrainedWordVector(glove_file)
   	self.readInData(train_file, 0)
   	self.convertToTrain()
@@ -111,7 +123,7 @@ class DataProcessor:
   		next(iterdata) # skip the first row
   		for row in iterdata:
   			row = row[0].split(',')
-  			
+    csvin.close()	
 
   def readTrainedWordVector(self, filename):
   	parser = argparse.ArgumentParser()
@@ -119,8 +131,8 @@ class DataProcessor:
   	args = parser.parse_args()
   	index = 0
   	words = {}
-	vocab = {}
-	ivocab = {}
+  	vocab = {}
+  	ivocab = {}
   	with open(args.vectors_file, 'r') as f:
   		for line in f:
   			vals = line.rstrip().split(' ')
@@ -135,54 +147,59 @@ class DataProcessor:
   			words[word] = np.array([float(x) for x in vals[1:]])
   			# if index == 10:
   			# 	print words[word]
-	# normalize correctly now
+  	# normalize correctly now
 
-	self.vocab_size = len(words)
-	# vector_dim = len(words[ivocab[0]]) # the same as N
-	W = np.zeros((self.vocab_size, self.N))
-	for word, v in words.items():
-		W[vocab[word], :] = v
-	W_norm = np.zeros(W.shape)
-	d = (np.sum(W ** 2, 1) ** (0.5))
-	W_norm = (W.T / d).T
+  	self.vocab_size = len(words)
+  	# vector_dim = len(words[ivocab[0]]) # the same as N
+  	W = np.zeros((self.vocab_size, self.N))
+  	for word, v in words.items():
+  		W[vocab[word], :] = v
+  	W_norm = np.zeros(W.shape)
+  	d = (np.sum(W ** 2, 1) ** (0.5))
+  	W_norm = (W.T / d).T
 
-	self.W = W_norm
-	self.vocab = vocab
-	self.ivocab = ivocab
+  	self.W = W_norm
+  	self.vocab = vocab
+  	self.ivocab = ivocab
 
   def convertToTrain(self):
-  	train_X = np.zeros((self.nTrain, N))
-  	train_Y = np.zeros(self.nTrain)
-  	index = 0
-	for e_id, e in self.train.items():
-		train_X[index, :] = e.getVector()
-		train_Y[index] = e.getGrade()
-	self.trainX = train_X
-	self.trainY = train_Y
-
-	valid_X = np.zeros((self.nValid, N))
-	valid_Y = np.zeros(self.nValid)
-	index = 0
-	for e_id, e in self.valid.items():
-		valid_X[index, :] = e.getVector()
-		valid_Y[index] = e.getGrade()
-	self.validX = valid_X
-	self.validY = valid_Y
-
-	test_X = np.zeros((self.nTest, N))
-	test_Y = np.zeros(self.nTest)
-	index = 0
-	for e_id, e in self.test.items():
-		test_X[index, :] = e.getVector()
-		test_Y[index] = e.getGrade()
-	self.testX = test_X
-	self.testY = test_Y
+    train_X = np.zeros((self.nTrain, self.N))
+    train_Y = np.zeros((self.nTrain, 1))
+    index = 0
+    for e_id, e in self.train.items():
+      train_X[index, :] = e.getVector()
+      train_Y[index] = e.getGrade()
+      index += 1
+      # print "a: ", train_Y[index]
+    self.trainX = train_X
+    self.trainY = train_Y
+    # print train_X
+    # print train_Y
+    valid_X = np.zeros((self.nValid, self.N))
+    valid_Y = np.zeros((self.nValid, 1))
+    index = 0
+    for e_id, e in self.valid.items():
+      valid_X[index, :] = e.getVector()
+      valid_Y[index] = e.getGrade()
+      index += 1
+    self.validX = valid_X
+    self.validY = valid_Y
+    test_X = np.zeros((self.nTest, self.N))
+    test_Y = np.zeros((self.nTest, 1))
+    index = 0
+    for e_id, e in self.test.items():
+      test_X[index, :] = e.getVector()
+      test_Y[index] = e.getGrade()
+      index += 1
+    self.testX = test_X
+    self.testY = test_Y
 
 
   def readInData(self, filename, mode):
-  	train_list = {}
-  	valid_list = {}
-  	test_list = {}
+    essays = []
+  	# train_list = {}
+  	# valid_list = {}
+  	# test_list = {}
   	with open(filename, 'rb') as tsv:
   		data = csv.reader(tsv, delimiter='\n')
   		iterdata = iter(data)
@@ -194,13 +211,13 @@ class DataProcessor:
   			# entries = [x for x in entries if x != '']
   			# print entries, len(entries)
   			# print entries[6]
-  			if mode == "train":
+  			if mode == 0:
   				essay = Essay(entries, True)
   			else:
   				essay = Essay(entries, False)
   			# print "essay set: ", essay.set
   			# print "grade: ", essay.grade
-  			if essay.set > 1:
+  			if essay.set > 6:
   				# print "end of 6"
   				break
   			essay_vector = np.zeros(self.N)
@@ -260,9 +277,10 @@ if __name__ == '__main__':
   # W, vocab, ivocab = processor.readTrainedWordVector(glove_file)
   # processor.readInData(train_file, 0)
   # processor.convertToTrain()
-  print "# train sample: ", processor.trainX.shape
-  print "# valid sample: ", processor.validX.shape
-  print "# test sample: ", processor.testX.shape
+  # print "# train sample: ", processor.trainX.shape
+  # print "# valid sample: ", processor.validX.shape
+  # print "# test sample: ", processor.testX.shape
+  # print "train Y: ", processor.trainY
   # processor.readPrediction(prediction_file)
   # processor.readInData(valid_file, 1)
   # processor.readInData(valid_file, "valid")

@@ -23,18 +23,18 @@ class Config(object):
   batch_size = 32
   num_domains = 1
   hidden_size = 100
-  max_epochs = 24
+  max_epochs = 50
   early_stopping = 2
   dropout = 0.9
-  lr = 0.001
-  l2 = 0.0001
+  lr = 0.004
+  l2 = 0.002
   train_fract = 0.7
   window_size = 3
 
 class EssayGraderModel(LanguageModel):
 
   def load_data(self, debug=False):
-    data_processor = DataProcessor()
+    data_processor = DataProcessor(self.config.embed_size)
     # data_processor.readTrainedWordVector(glove_file)
     # processor.readInData(train_file, 0)
     # processor.convertToTrain()
@@ -47,13 +47,17 @@ class EssayGraderModel(LanguageModel):
     # self.X_dev = X_train[num_train:]
     # self.y_dev = y_train[num_train:]
     self.X_train = data_processor.trainX
-    self.Y_train = data_processor.trainY
+    self.y_train = data_processor.trainY
     self.X_dev = data_processor.validX
-    self.Y_dev = data_processor.validY
-
+    self.y_dev = data_processor.validY
+    self.X_test = data_processor.testX
+    self.y_test = data_processor.testY
+    self.num_uniquewords = data_processor.vocab_size
+    # print self.X_train
+    # print self.y_dev
     # Load the test set (dummy labels only)
     # self.X_test, self.y_test = data_processor.getData(1)
-    self.num_uniquewords = data_processor.getNumUnique() #to recieve
+    # self.num_uniquewords = data_processor.getNumUnique() #to recieve
 
 
   def add_placeholders(self):
@@ -81,7 +85,8 @@ class EssayGraderModel(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    self.input_placeholder = tf.placeholder(tf.int32, shape=(None, self.config.max_essay_length))
+    self.input_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.embed_size))
+    # self.input_placeholder = tf.placeholder(tf.int32, shape=(None, self.config.max_essay_length))
     self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.num_domains))
     self.dropout_placeholder = tf.placeholder(tf.float32)
     ### END YOUR CODE
@@ -128,7 +133,7 @@ class EssayGraderModel(LanguageModel):
         word_vecs = tf.reduce_mean(word_vecs, 1)
       return word_vecs
 
-  def add_model(self, window):
+  def add_model(self):
     """Adds the 1-hidden-layer NN.
 
     Hint: Use a variable_scope (e.g. "Layer") for the first hidden layer, and
@@ -159,15 +164,15 @@ class EssayGraderModel(LanguageModel):
     with tf.variable_scope('Layer') as hidden:
       W = tf.get_variable('W', (self.config.embed_size, self.config.hidden_size), initializer=xavier_weight_init())
       b1 = tf.get_variable('b1', (self.config.hidden_size,), initializer=xavier_weight_init())
-      h = tf.tanh(tf.matmul(window, W)+ b1)
+      h = tf.tanh(tf.matmul(self.input_placeholder, W)+ b1)
       with tf.variable_scope('Layer2') as hidden_2:
         W2 = tf.get_variable('W2', (self.config.hidden_size, self.config.hidden_size), initializer=xavier_weight_init())
         b2 = tf.get_variable('b2', (self.config.hidden_size,), initializer=xavier_weight_init())
         h2 = tf.tanh(tf.matmul(h, W2)+ b2)
         with tf.variable_scope('Score') as score_scope:
           U = tf.get_variable('U', (self.config.hidden_size, self.config.num_domains), initializer=xavier_weight_init())
-          h2 = tf.nn.dropout(h2, self.dropout_placeholder)
-          output = tf.matmul(h2, U)
+          h3 = tf.nn.dropout(h2, self.dropout_placeholder)
+          output = tf.matmul(h3, U)
           regularization = self.config.l2*0.5*(tf.reduce_sum(tf.square(W)) + tf.reduce_sum(tf.square(W2)) + tf.reduce_sum(tf.square(U)))
           tf.add_to_collection('REGULARIZATION_LOSSES', regularization)
 
@@ -186,8 +191,7 @@ class EssayGraderModel(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    print reg
-    reg = tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Layer2/Score')
+    reg = 0 #tf.get_collection("REGULARIZATION_LOSSES", scope='Layer/Layer2/Score')[0]
     loss = tf.reduce_mean(tf.square(y - self.labels_placeholder)) + reg
     ### END YOUR CODE
     return loss
@@ -222,8 +226,8 @@ class EssayGraderModel(LanguageModel):
     self.config = config
     self.load_data(debug=False)
     self.add_placeholders()
-    window = self.add_embedding()
-    y = self.add_model(window)
+    # window = self.add_embedding()
+    y = self.add_model()
     self.predictions = y
     self.loss = self.add_loss_op(y)
     self.train_op = self.add_training_op(self.loss)
@@ -241,7 +245,7 @@ class EssayGraderModel(LanguageModel):
                    label_size=self.config.num_domains, shuffle=shuffle)):
       feed = self.create_feed_dict(input_batch=x, dropout=dp, label_batch=y)
       loss, _ = session.run(
-          [self.loss, self.train_op],
+          [self.loss,  self.train_op],
           feed_dict=feed)
       total_processed_examples += len(x)
       total_loss.append(loss)
@@ -275,6 +279,12 @@ class EssayGraderModel(LanguageModel):
         loss, preds = session.run(
             [self.loss, self.predictions], feed_dict=feed)
         losses.append(loss)
+        # comp = np.hstack((preds, y))
+        # print comp
+        # print 'example loss'
+        # print np.mean(np.square(preds - y))
+        # print 'actual loss'
+        # print loss
       else:
         preds = session.run(self.predictions, feed_dict=feed)
       results.extend(preds)
@@ -324,8 +334,9 @@ def test_SimpleEssayGrader():
       saver.restore(session, './weights/ner.weights')
       print 'Test'
       print '=-=-='
-      print 'Writing predictions to q2_test.predicted'
       res = model.predict(session, model.X_test, model.y_test)
+      print "Test loss"
+      print res
 
 if __name__ == "__main__":
   test_SimpleEssayGrader()
