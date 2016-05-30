@@ -8,9 +8,10 @@ from nltk import word_tokenize
 from nltk.stem.porter import PorterStemmer
 import string
 
-train_file = "/Users/Chip/GitHub/CS224D/data/train_small.tsv"
-test_file = "/Users/Chip/GitHub/CS224D/data/test_small.tsv"
-valid_file = "/Users/Chip/GitHub/CS224D/data/valid_small.tsv"
+
+train_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/data/training_set.tsv"
+test_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/data/test_set.tsv"
+valid_file = "/Users/luciodery/Desktop/Stanford!/spring2015/CS224D/FinalProject/data/valid_set.tsv"
 prediction_file = "/Users/Chip/GitHub/CS224D/data/valid_sample_submission_5_column.csv"
 glove_file = "/Users/Chip/GitHub/CS224D/models/glove.6B/glove.6B.50d.txt"
 ESSAY_INDEX = 2
@@ -84,37 +85,32 @@ ivocab = dict()
 """
 
 #will need to unpack the information.
-class DataProcessor:
+class TFIDFProcessor:
 
   def __init__(self, N):
-  	self.N = N
-  	self.train = None
-  	self.test = None
-  	self.valid = None
-  	self.pred = None
-  	self.vocab_size = None
-  	self.nTrain = None
-  	self.nValid = None
-  	self.nTest = None
-  	self.trainX = None
-  	self.trainY = None
-  	self.validX = None
-  	self.validY = None
-  	self.testX = None
-  	self.testY = None
-    # self.train_tfidf_matrix = None
-    # self.train_grade = None
-    # train, labels = readInData(train_file, 0)
-    # stemmer = PorterStemmer()
-    # vectorizer = CountVectorizer(tokenizer=tokenize, stop_words='english', encoding="ISO-8859-1")
-    # train_matrix = vectorizer.fit_transform(train)
-    # vocab = vectorizer.vocabulary_
-    # print "vocab size: ", len(vocab)
-    # tfidf = TfidfTransformer(norm="l2")
-    # tfidf.fit(train_matrix)
-    # self.train_tfidf_matrix = tfidf.transform(train_matrix)
-    # print self.train_tfidf_matrix
-    # self.train_grade = np.array(grades)
+    self.N = N
+    self.train = None
+    self.test = None
+    self.valid = None
+    self.pred = None
+    self.vocab_size = None
+    self.nTrain = None
+    self.nValid = None
+    self.nTest = None
+    self.trainX = None
+    self.trainY = None
+    self.validX = None
+    self.validY = None
+    self.testX = None
+    self.testY = None
+    train, labels = self.readInData(train_file, 0)
+    vectorizer = CountVectorizer(tokenizer=tokenize, stop_words='english', encoding="ISO-8859-1")
+    train_matrix = vectorizer.fit_transform(train)
+    tfidf = TfidfTransformer(norm="l2")
+    tfidf.fit(train_matrix)
+    self.train_tfidf_matrix = tfidf.transform(train_matrix)
+    print "shape: ", self.train_tfidf_matrix.shape
+    self.train_grade = np.array(labels)
     # print self.train_grade
     # if dataset == 0:
     #   if os.path.isfile(self.saved_data_essay_final):
@@ -188,13 +184,14 @@ class DataProcessor:
           essay = Essay(entries, True)
         else:
           essay = Essay(entries, False)
-        if essay.set > 1:
+        if essay.set > 6:
           break
         essays.append(essay.content)
         grades.append(essay.grade)
       tsv.close()
     return essays, grades
 
+stemmer = PorterStemmer()
 def stem_tokens(tokens, stemmer):
   stemmed = []
   for item in tokens:
@@ -203,7 +200,7 @@ def stem_tokens(tokens, stemmer):
 
 def tokenize(text):
   text = "".join([ch for ch in text if ch not in string.punctuation])
-  print "text: ", text
+  # print "text: ", text
   tokens = nltk.word_tokenize(text)
   stems = stem_tokens(tokens, stemmer)
   return stems
